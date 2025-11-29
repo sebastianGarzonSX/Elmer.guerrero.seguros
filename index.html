@@ -302,6 +302,37 @@
             border-radius: 50%;
             animation: float 4s ease-in-out infinite;
         }
+        
+        /* Flying Shield Animation Styles */
+        #flying-shield {
+            filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.8)) drop-shadow(0 0 20px rgba(16, 185, 129, 0.5));
+            transition: filter 0.3s ease;
+        }
+        #flying-shield.active {
+            filter: drop-shadow(0 0 15px rgba(16, 185, 129, 1)) drop-shadow(0 0 30px rgba(16, 185, 129, 0.8)) drop-shadow(0 0 45px rgba(16, 185, 129, 0.5));
+        }
+        #flying-shield.arrived {
+            filter: drop-shadow(0 0 20px rgba(37, 211, 102, 1)) drop-shadow(0 0 40px rgba(37, 211, 102, 0.8));
+        }
+        .shield-particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.9) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        @keyframes shieldPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        @keyframes shieldRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #flying-shield.spinning i {
+            animation: shieldRotate 0.5s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
@@ -318,8 +349,8 @@
     <nav class="bg-black/95 backdrop-blur-sm text-white p-4 shadow-lg sticky top-0 z-50 border-b border-green-900">
         <div class="container mx-auto flex justify-between items-center">
             <a href="#" class="text-2xl font-bold text-white flex items-center gap-2 group">
-                <span class="text-3xl text-green-500 group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-shield-halved"></i></span> 
-                Elmer Guerrero <span class="text-green-500">Seguros</span>
+                <span id="header-shield" class="text-3xl text-green-500 group-hover:scale-110 transition-transform duration-300"><i class="fa-solid fa-shield-halved"></i></span> 
+                SELLER ⟡ SEG <span class="text-green-500"></span>
             </a>
             <div class="hidden md:flex space-x-8 font-medium">
                 <a href="#" class="hover:text-green-400 transition relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-0 after:h-0.5 after:bg-green-500 after:transition-all hover:after:w-full">Inicio</a>
@@ -1083,7 +1114,7 @@
                     </a>
                 </div>
                 
-                <a href="https://wa.me/573143722904?text=Hola,%20me%20interesa%20informaci%C3%B3n%20sobre%20seguros" target="_blank" class="w-full max-w-lg bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-green-500/30 flex justify-center items-center gap-2">
+                <a id="iniciar-conversacion-btn" href="https://wa.me/573143722904?text=Hola,%20me%20interesa%20informaci%C3%B3n%20sobre%20seguros" target="_blank" class="w-full max-w-lg bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition duration-300 transform hover:-translate-y-1 shadow-lg hover:shadow-green-500/30 flex justify-center items-center gap-2">
                     <i class="fa-brands fa-whatsapp text-xl"></i> Iniciar Conversación
                 </a>
                 <p class="text-gray-500 text-sm mt-4">Respuesta rápida garantizada</p>
@@ -1152,9 +1183,15 @@
     </button>
 
     <!-- WhatsApp Floating Button -->
-    <a href="https://wa.me/573143722904?text=Hola,%20me%20interesa%20información%20sobre%20seguros" target="_blank" class="fixed bottom-8 left-8 w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 transition-all duration-300 hover:scale-110 animate-bounce">
+    <a id="whatsapp-btn" href="https://wa.me/573143722904?text=Hola,%20me%20interesa%20información%20sobre%20seguros" target="_blank" class="fixed bottom-8 left-8 w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 transition-all duration-300 hover:scale-110 animate-bounce">
         <i class="fa-brands fa-whatsapp text-2xl"></i>
     </a>
+
+    <!-- Animated Flying Shield -->
+    <div id="flying-shield" class="fixed pointer-events-none z-[999] text-green-500 opacity-0" style="font-size: 2rem;">
+        <i class="fa-solid fa-shield-halved"></i>
+        <div id="shield-trail" class="absolute inset-0 pointer-events-none"></div>
+    </div>
 
     <!-- AOS Library Script -->
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
@@ -1357,6 +1394,187 @@
                 complete: () => burst.remove()
             });
         });
+
+        // ============================================
+        // FLYING SHIELD ANIMATION - SCROLL LINKED
+        // ============================================
+        
+        const flyingShield = document.getElementById('flying-shield');
+        const headerShield = document.getElementById('header-shield');
+        const whatsappBtn = document.getElementById('iniciar-conversacion-btn');
+        
+        if (flyingShield && headerShield && whatsappBtn) {
+            let shieldActivated = false;
+            let shieldArrived = false;
+            let particleCounter = 0;
+            
+            // Get element center position relative to document
+            function getElementDocPosition(el) {
+                const rect = el.getBoundingClientRect();
+                return {
+                    x: rect.left + rect.width / 2 + window.scrollX,
+                    y: rect.top + rect.height / 2 + window.scrollY
+                };
+            }
+            
+            // Create particle trail
+            function createParticle(x, y) {
+                const particle = document.createElement('div');
+                particle.className = 'shield-particle';
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+                particle.style.position = 'fixed';
+                document.body.appendChild(particle);
+                
+                anime({
+                    targets: particle,
+                    scale: [1, 0],
+                    opacity: [1, 0],
+                    translateX: anime.random(-20, 20),
+                    translateY: anime.random(-20, 20),
+                    duration: 600,
+                    easing: 'easeOutExpo',
+                    complete: () => particle.remove()
+                });
+            }
+            
+            // Main scroll handler for shield animation
+            function updateShieldPosition() {
+                const windowHeight = window.innerHeight;
+                const windowWidth = window.innerWidth;
+                
+                // FIXED positions - start at header (top left area)
+                const startX = 180; // Near the logo
+                const startY = 30;  // Top of page
+                
+                // FIXED end position - bottom left where whatsapp button area is
+                const endX = windowWidth * 0.55; // Center-right of screen
+                const endY = windowHeight - 150; // Near bottom
+                
+                // Total scrollable distance
+                const maxScroll = document.documentElement.scrollHeight - windowHeight;
+                
+                // Progress based on total page scroll (0 to 1)
+                let progress = window.scrollY / maxScroll;
+                progress = Math.max(0, Math.min(progress, 1));
+                
+                // Activate shield when we start scrolling
+                if (progress > 0.02 && !shieldActivated) {
+                    shieldActivated = true;
+                    flyingShield.style.opacity = '1';
+                    flyingShield.classList.add('active');
+                    headerShield.style.opacity = '0.3';
+                    
+                    anime({
+                        targets: flyingShield,
+                        scale: [0.3, 1.2, 1],
+                        duration: 400,
+                        easing: 'easeOutBack'
+                    });
+                }
+                
+                // Update shield position if active
+                if (shieldActivated && !shieldArrived) {
+                    const t = progress;
+                    
+                    // Multiple control points for a more interesting S-curve path
+                    // First go LEFT, then swing RIGHT, then to destination
+                    const cp1X = startX - 200;  // First curve - go far left
+                    const cp1Y = windowHeight * 0.25;
+                    
+                    const cp2X = windowWidth * 0.8;  // Second curve - swing right
+                    const cp2Y = windowHeight * 0.55;
+                    
+                    // Cubic bezier curve for smoother S-path
+                    const mt = 1 - t;
+                    const mt2 = mt * mt;
+                    const mt3 = mt2 * mt;
+                    const t2 = t * t;
+                    const t3 = t2 * t;
+                    
+                    // Cubic bezier formula: P = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
+                    const currentX = mt3 * startX + 3 * mt2 * t * cp1X + 3 * mt * t2 * cp2X + t3 * endX;
+                    const currentY = mt3 * startY + 3 * mt2 * t * cp1Y + 3 * mt * t2 * cp2Y + t3 * endY;
+                    
+                    // Dynamic effects based on progress
+                    const wobble = Math.sin(t * Math.PI * 6) * 12 * Math.sin(t * Math.PI); // Wobble peaks in middle
+                    const scale = 1 + Math.sin(t * Math.PI) * 0.5; // Bigger in the middle
+                    const rotation = t * 720; // Two full rotations
+                    
+                    flyingShield.style.left = (currentX + wobble) + 'px';
+                    flyingShield.style.top = currentY + 'px';
+                    flyingShield.style.transform = `scale(${scale}) rotate(${rotation}deg)`;
+                    
+                    // Create particles occasionally
+                    particleCounter++;
+                    if (particleCounter % 4 === 0 && progress > 0.05 && progress < 0.95) {
+                        createParticle(currentX + wobble, currentY);
+                    }
+                    
+                    // Arrived at destination (95% scroll)
+                    if (progress >= 0.95 && !shieldArrived) {
+                        shieldArrived = true;
+                        flyingShield.classList.add('arrived');
+                        
+                        // Get actual button position for final landing
+                        const btnRect = whatsappBtn.getBoundingClientRect();
+                        const finalX = btnRect.left + btnRect.width / 2;
+                        const finalY = btnRect.top + btnRect.height / 2;
+                        
+                        // Animate to exact button position
+                        anime({
+                            targets: flyingShield,
+                            left: finalX + 'px',
+                            top: finalY + 'px',
+                            scale: [scale, 1.5, 0],
+                            opacity: [1, 1, 0],
+                            duration: 600,
+                            easing: 'easeInOutQuad'
+                        });
+                        
+                        // Pulse button
+                        anime({
+                            targets: whatsappBtn,
+                            scale: [1, 1.15, 1],
+                            duration: 700,
+                            easing: 'easeOutElastic(1, .5)'
+                        });
+                        
+                        // Particle burst at button
+                        setTimeout(() => {
+                            for (let i = 0; i < 20; i++) {
+                                setTimeout(() => createParticle(finalX, finalY), i * 25);
+                            }
+                        }, 300);
+                    }
+                }
+                
+                // Reset if scrolled back to top
+                if (window.scrollY < 50 && shieldActivated) {
+                    shieldActivated = false;
+                    shieldArrived = false;
+                    flyingShield.style.opacity = '0';
+                    flyingShield.classList.remove('active', 'arrived');
+                    headerShield.style.opacity = '1';
+                    flyingShield.style.transform = 'scale(1) rotate(0deg)';
+                }
+            }
+            
+            // Throttled scroll listener
+            let ticking = false;
+            window.addEventListener('scroll', () => {
+                if (!ticking) {
+                    requestAnimationFrame(() => {
+                        updateShieldPosition();
+                        ticking = false;
+                    });
+                    ticking = true;
+                }
+            });
+            
+            // Initial position
+            updateShieldPosition();
+        }
 
         // ============================================
         // ORIGINAL SCRIPTS
